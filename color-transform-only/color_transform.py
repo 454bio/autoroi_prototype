@@ -1,6 +1,8 @@
+from argparse import ArgumentParser
 import math
 import os
 import re
+from typing import Tuple
 import pandas as pd
 import numpy as np
 from sklearn import linear_model
@@ -8,6 +10,7 @@ import cv2 as cv
 import matplotlib.pyplot as plt
 import matplotlib.colors
 from scipy import ndimage
+from scipy.spatial import KDTree
 import roifile
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -17,6 +20,7 @@ def OLD_get_cycle_files():
     pass
 
 DYE_BASES = ["G", "C", "A", "T"]
+DICTIONARY_SPOTS = DYE_BASES + ["BG"]
 
 OLIGO_SEQUENCES = {
     '355': 'ACGTGACTAGTGCATCACGTGACTAGTGCATC',
@@ -401,5 +405,80 @@ def OLD_calculate_and_apply_transformation(
 
     return df_out
 
+FILENAME_FORMAT = re.compile(r'(\d+)_(\d+)_(C\d+).tif')
+def parse_image_filename(filename: str) -> Tuple[int, int]:
+    parsed = FILENAME_FORMAT.search(filename)
+    # TODO: Convert to int?
+    cycle = int(parsed.group(3).lstrip("C"))
+    wavelength = int(parsed.group(2))
+    return (cycle, wavelength)
+
+def select_cycle(spots: pd.DataFrame, cycle: int) -> pd.DataFrame:
+    # Manually select the wavelengths to ensure the order is consistent
+    return spots[[(cycle, 645), (cycle, 590), (cycle, 525), (cycle, 445)]]
+
+def deduplicate_spots(spots: pd.DataFrame, min_distance_between_rois: int) -> pd.DataFrame:
+    tree = KDTree(spots["position"])
+    spot_indices_to_remove = set()
+    for first_index, second_index in tree.query_pairs(min_distance_between_rois):
+        first = spots.iloc[first_index]
+        second = spots.iloc[second_index]
+
+        # First, ensure we keep the dictionary spots
+        if first.name in DICTIONARY_SPOTS:
+            spot_indices_to_remove.add(second_index)
+        elif second.name in DICTIONARY_SPOTS:
+            spot_indices_to_remove.add(first_index)
+        else:
+            # Otherwise, keep the brighter spot across all wavelengths for the first cycle
+            first_signal = sum(select_cycle(first, 1))
+            second_signal = sum(select_cycle(second, 1))
+            if first_signal > second_signal:
+                spot_indices_to_remove.add(second_index)
+            else:
+                # `else`: this case is selected if there is a tie
+                spot_indices_to_remove.add(first_index)
+
+    return spots.drop(spots.iloc[list(spot_indices_to_remove)].index)
+
+def calculate_transformation(spots: pd.DataFrame) -> linear_model.LinearRegression:
+    # TODO: Automatically find reasonable dictionary spots instead
+    # TODO: Why do we care about background/BG? We never use it
+    dictionary_spots = spots[spots.index.isin(DICTIONARY_SPOTS)]
+    if len(dictionary_spots) != len(DICTIONARY_SPOTS):
+        print(dictionary_spots)
+        raise Exception(f"Dictionary missing from spots")
+
+    dye_spot_to_index_map = {dye_spot: i for i, dye_spot in enumerate(DYE_BASES)}
+
+    # Set up a linear regression to determine each dye's contribution to each channel.
+    # X is the input data from the dictionary spots for the first cycle only, where the bases are known.
+    X = select_cycle(dictionary_spots, 1)
+    # Y is the identity matrix we are trying to transform into.
+    Y = np.zeros((len(dictionary_spots), len(DYE_BASES)))
+    for i, base_spotname in enumerate(dictionary_spots.index):
+        if base_spotname != "BG":
+            Y[i, dye_spot_to_index_map[base_spotname]] = 1
+
+    transformation = linear_model.LinearRegression()
+    return transformation.fit(X, Y)
+
+parser = ArgumentParser()
+parser.add_argument("spots_path")
+parser.add_argument("-r", type=int, default=2, help="Minimum distance between ROIs")
+
 if __name__ == "__main__":
-    pass
+    args = parser.parse_args()
+
+    # Load and format data
+    spots = pd.read_csv(args.spots_path)
+    spots.columns = pd.MultiIndex.from_tuples([("spot", "id"), ("position", "x"), ("position", "y"), *map(parse_image_filename, spots.columns[3:])])
+    spots = spots.set_index(("spot", "id")).astype(np.uint32)
+
+    # Run multiple times to ensure only one detected spot remains for each cluster
+    for _ in range(3):
+        spots = deduplicate_spots(spots, args.r)
+
+    transformation = calculate_transformation(spots)
+    print(transformation.coef_)
+    print(transformation.intercept_)
