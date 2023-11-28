@@ -13,7 +13,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # TODO: Refactor users to use intensity values directly from the CSV
-from .common import get_cycle_files
+def OLD_get_cycle_files():
+    pass
 
 DYE_BASES = ["G", "C", "A", "T"]
 
@@ -57,34 +58,8 @@ DEFAULT_BASE_COLOR_MAP = {
 }
 
 
-def get_roi_mask(shape, rois):
-
-    mask = np.zeros(shape, dtype=np.uint16)
-    print(f"mask: {type(mask)}, {mask.dtype}, {mask.shape}")
-
-    for idx, roi in enumerate(rois):
-        if __debug__:
-            print(roi.name, roi.top, roi.bottom, roi.left, roi.right, roi.roitype, roi.subtype, roi.options, roi.version, roi.props, roi.position)
-#            print(roi)
-
-        yc = np.uint16(roi.top + (roi.bottom - roi.top) / 2)
-        xc = np.uint16(roi.left + (roi.right - roi.left) / 2)
-        x_axis_length = int((roi.right - roi.left) / 2.0)
-        y_axis_length = int((roi.bottom - roi.top) / 2.0)
-
-        label_id = idx + 1
-        mask = cv.ellipse(mask, (xc, yc), [x_axis_length, y_axis_length], angle=0, startAngle=0, endAngle=360,
-                          color=label_id, thickness=-1)
-
-    # how many regions?
-    nb_labels = len(rois)
-    label_ids = np.arange(1, nb_labels + 1)  # range(1, nb_labels + 1)
-    print(f"labels: {nb_labels}")
-
-    sizes = ndimage.sum_labels(np.ones(mask.shape), mask, range(nb_labels + 1)).astype(int)
-    print(f"number of pixels per label: {sizes}")
-
-    return [mask, nb_labels]
+def OLD_get_roi_mask(shape, rois):
+    pass
 
 
 
@@ -183,23 +158,17 @@ def plot_bars(
     return fig
 
 
-# TODO: Signature
-def calculate_and_apply_transformation(
-        spot_data_filename: str,
-        roizipfilepath: str,
-        input_directory_path: str,
-        output_directory_path: str
+def OLD_calculate_and_apply_transformation(
+    OLD_spot_data_filename: str,
+    OLD_roizipfilepath: str,
+    OLD_input_directory_path: str,
+    output_directory_path: str
 ) -> pd.DataFrame:
     
-    channel_names = ['R365', 'G365', 'B365', 'R445', 'G445', 'B445', 'R525', 'G525', 'B525', 'R590', 'G590', 'B590', 'R645', 'G645', 'B645']
+    channel_names = ['M445', 'M525', 'M590', 'M645']
 
-    df = pd.read_csv(spot_data_filename)
+    df = pd.read_csv(OLD_spot_data_filename)
     print(df)
-    
-    # TODO, HACK, fix me
-    if 'M445' in df.columns:
-        channel_names = ['M445', 'M525', 'M590', 'M645']
-
 
     '''
         spot  pixel_i  timestamp_ms  cycle  R365  ...   G590   B590   R645   G645   B645
@@ -280,10 +249,10 @@ def calculate_and_apply_transformation(
 
     # apply matrix to each cycle
 
-    df_files = get_cycle_files(input_directory_path)
+    df_files = OLD_get_cycle_files(OLD_input_directory_path)
     print(df_files)
 
-    rois = roifile.ImagejRoi.fromfile(roizipfilepath)
+    rois = roifile.ImagejRoi.fromfile(OLD_roizipfilepath)
     print(rois)
 
     rows_list = []
@@ -338,7 +307,7 @@ def calculate_and_apply_transformation(
         assert (a.shape[2] == n_targets)
         print("Transformation applied, shape", a.shape, type(a))
 
-        oligo_mask, nb_labels = get_roi_mask((dim0, dim1), rois)
+        oligo_mask, nb_labels = OLD_get_roi_mask((dim0, dim1), rois)
 
 #        nb_labels = len(rois)
         label_ids = np.arange(1, nb_labels + 1)  # range(1, nb_labels + 1)
