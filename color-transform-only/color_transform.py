@@ -463,8 +463,26 @@ def calculate_transformation(spots: pd.DataFrame) -> linear_model.LinearRegressi
     transformation = linear_model.LinearRegression()
     return transformation.fit(X, Y)
 
+def apply_transformation(spots: pd.DataFrame, transformation: linear_model.LinearRegression) -> pd.DataFrame:
+    cycles = set([col[0] for col in spots.columns if isinstance(col[0], int)])
+    transformed = spots.drop(columns=cycles)
+
+    def transformation_impl(x):
+        # Temporarily reshape to satisfy sklearn
+        return transformation.predict(x.to_numpy().reshape(1, -1)).reshape(-1)
+
+    for cycle in cycles:
+        cycle_spots = select_cycle(spots, cycle)
+        applied = cycle_spots.apply(transformation_impl, axis="columns", result_type="expand")
+        applied.columns = pd.MultiIndex.from_tuples(zip([cycle]*len(DYE_BASES), DYE_BASES))
+
+        transformed = pd.concat([transformed, applied], axis="columns")
+
+    return transformed
+
 parser = ArgumentParser()
 parser.add_argument("spots_path")
+parser.add_argument("output_path")
 parser.add_argument("-r", type=int, default=2, help="Minimum distance between ROIs")
 
 if __name__ == "__main__":
@@ -479,6 +497,10 @@ if __name__ == "__main__":
     for _ in range(3):
         spots = deduplicate_spots(spots, args.r)
 
+    # TODO: Reindex spots?
+
     transformation = calculate_transformation(spots)
-    print(transformation.coef_)
-    print(transformation.intercept_)
+    transformed_spots = apply_transformation(spots, transformation)
+
+    # TODO: Put this in color_transformed_spots format
+    transformed_spots.to_csv(args.output_path)
