@@ -88,6 +88,8 @@ def apply_transformation(spots: pd.DataFrame, transformation: linear_model.Linea
 def convert_to_color_transformed_spots(transformed: pd.DataFrame, output_path: str, reindex: bool = True) -> None:
     unique_spots = transformed.index.unique()
     spot_name_to_index = {name: index for index, name in enumerate(unique_spots)}
+    # TODO: Make this a CSV instead
+    print(spot_name_to_index)
 
     cycles = set([col[0] for col in transformed.columns if isinstance(col[0], int)])
     # Take only the cycle data...
@@ -109,7 +111,7 @@ def convert_to_color_transformed_spots(transformed: pd.DataFrame, output_path: s
 
 parser = ArgumentParser()
 parser.add_argument("spots_path")
-parser.add_argument("output_path")
+parser.add_argument("-o", default="color_transformed_spots.csv")
 parser.add_argument("-r", type=int, default=4, help="Minimum distance between ROIs")
 
 if __name__ == "__main__":
@@ -124,6 +126,10 @@ if __name__ == "__main__":
     for _ in range(3):
         spots = deduplicate_spots(spots, args.r)
 
+    spots.to_csv("deduplicated_spots.csv")
+
     transformation = calculate_transformation(spots)
     transformed_spots = apply_transformation(spots, transformation)
-    convert_to_color_transformed_spots(transformed_spots, args.output_path)
+    transformed_spots.to_csv("transformed_spots.csv")
+
+    convert_to_color_transformed_spots(transformed_spots, args.o)
