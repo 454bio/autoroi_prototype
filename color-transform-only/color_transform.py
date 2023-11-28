@@ -480,10 +480,32 @@ def apply_transformation(spots: pd.DataFrame, transformation: linear_model.Linea
 
     return transformed
 
+def convert_to_color_transformed_spots(transformed: pd.DataFrame, output_path: str, reindex: bool = True) -> None:
+    unique_spots = transformed.index.unique()
+    spot_name_to_index = {name: index for index, name in enumerate(unique_spots)}
+
+    cycles = set([col[0] for col in transformed.columns if isinstance(col[0], int)])
+    # Take only the cycle data...
+    color_transformed_spots = transformed[list(cycles)]
+    # ... make a column for cycles...
+    color_transformed_spots = color_transformed_spots.stack(0, future_stack=True)
+    # ... rename the columns...
+    color_transformed_spots.index.rename(["spot_name", "cycle"], inplace=True)
+    color_transformed_spots = color_transformed_spots.reset_index()
+    # ... create the spot_index column in the right spot...
+    color_transformed_spots["spot_index"] = color_transformed_spots["spot_name"].apply(spot_name_to_index.get)
+    color_transformed_spots = color_transformed_spots.reindex(["spot_index", "spot_name", "cycle", "G", "C", "A", "T"], axis="columns")
+    # ... and rename if requested.
+    if reindex:
+        color_transformed_spots["spot_name"] = color_transformed_spots["spot_index"]
+
+    print(color_transformed_spots)
+    color_transformed_spots.to_csv(output_path, index=False)
+
 parser = ArgumentParser()
 parser.add_argument("spots_path")
 parser.add_argument("output_path")
-parser.add_argument("-r", type=int, default=2, help="Minimum distance between ROIs")
+parser.add_argument("-r", type=int, default=4, help="Minimum distance between ROIs")
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -497,10 +519,6 @@ if __name__ == "__main__":
     for _ in range(3):
         spots = deduplicate_spots(spots, args.r)
 
-    # TODO: Reindex spots?
-
     transformation = calculate_transformation(spots)
     transformed_spots = apply_transformation(spots, transformation)
-
-    # TODO: Put this in color_transformed_spots format
-    transformed_spots.to_csv(args.output_path)
+    convert_to_color_transformed_spots(transformed_spots, args.output_path)
