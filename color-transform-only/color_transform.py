@@ -123,8 +123,9 @@ if __name__ == "__main__":
     spots = spots.set_index(("spot", "id")).astype(np.uint32)
 
     # Run multiple times to ensure only one detected spot remains for each cluster
-    for _ in range(3):
-        spots = deduplicate_spots(spots, args.r)
+    if args.r != 0:
+        for _ in range(3):
+            spots = deduplicate_spots(spots, args.r)
 
     spots.to_csv("deduplicated_spots.csv")
 
