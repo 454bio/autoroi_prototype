@@ -114,7 +114,7 @@ def convert_to_color_transformed_spots(transformed: pd.DataFrame, output_path: s
 parser = ArgumentParser()
 parser.add_argument("spots_path")
 parser.add_argument("-o", default="color_transformed_spots.csv")
-parser.add_argument("-r", type=int, default=4, help="Minimum distance between ROIs")
+parser.add_argument("-r", type=int, default=0, help="Minimum distance between ROIs")
 
 if __name__ == "__main__":
     args = parser.parse_args()
