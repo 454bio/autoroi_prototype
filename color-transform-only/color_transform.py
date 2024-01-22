@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from pathlib import Path
 from typing import Tuple
 import re
 
@@ -9,6 +10,7 @@ from scipy.spatial import KDTree
 
 DYE_BASES = ["G", "C", "A", "T"]
 DICTIONARY_SPOTS = DYE_BASES + ["BG"]
+OUTPUT_FILENAME = "color_transformed_spots.csv"
 
 FILENAME_FORMAT = re.compile(r'(\d+)_(\d+)_(C\d+).tif')
 def parse_image_filename(filename: str) -> Tuple[int, int]:
@@ -127,10 +129,11 @@ if __name__ == "__main__":
         for _ in range(3):
             spots = deduplicate_spots(spots, args.r)
 
-    spots.to_csv("deduplicated_spots.csv")
+    #spots.to_csv("deduplicated_spots.csv")
 
     transformation = calculate_transformation(spots)
     transformed_spots = apply_transformation(spots, transformation)
-    transformed_spots.to_csv("transformed_spots.csv")
+    #transformed_spots.to_csv("transformed_spots.csv")
+    outputpath=str(Path(args.spots_path).parent / OUTPUT_FILENAME)
 
-    convert_to_color_transformed_spots(transformed_spots, args.o)
+    convert_to_color_transformed_spots(transformed_spots, outputpath)
